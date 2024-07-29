@@ -1,19 +1,100 @@
-# To visualize data scraped from DWS gages near Musina
+# To analyze data for flow analysis
 
-library(tidyverse)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
 library(latex2exp)
 # install_github("LimpopoLab/hydrostats")
 library(hydrostats)
 
-x <- read_csv("X3H008.csv", col_names = FALSE)
-x <- x %>%
-     rename(dt=X1,UNIX=X2,lev_m=X3,levQC=X4,flow_m3s=X5,flowQC=X6) # note UNIX date time is UTC
+sandUp <- read_csv("X3H008.csv", col_names = FALSE)
+sandUp <- sandUp %>%
+     rename(dt=X1,UNIX=X2,lev_m=X3,levQC=X4,flow_m3s=X5,flowQC=X6) %>% # note UNIX date time is UTC
+     mutate(lev_m=replace(lev_m, which(lev_m<=0),NA)) %>%
+     mutate(flow_m3s=replace(flow_m3s, which(flow_m3s<=0),NA)) %>%
+     group_by(UNIX) %>%
+     summarize(lev_m=mean(lev_m,na.rm=TRUE), levQC=mean(levQC), flow_m3s=mean(flow_m3s,na.rm=TRUE), flowQC=mean(flowQC)) %>%
+     mutate(dt=with_tz(as_datetime(UNIX), tzone = "Africa/Johannesburg")) %>%
+     mutate(da=as_date(dt)) %>%
+     group_by(da) %>%
+     summarize(mean.flow=mean(flow_m3s,na.rm=TRUE)) %>%
+     mutate(Site = "Sand River - upstream")
+     
+sabiUp <- read_csv("X3H021.csv", col_names = FALSE)
+sabiUp <- sabiUp %>%
+     rename(dt=X1,UNIX=X2,lev_m=X3,levQC=X4,flow_m3s=X5,flowQC=X6) %>% # note UNIX date time is UTC
+     mutate(lev_m=replace(lev_m, which(lev_m<=0),NA)) %>%
+     mutate(flow_m3s=replace(flow_m3s, which(flow_m3s<=0),NA)) %>%
+     group_by(UNIX) %>%
+     summarize(lev_m=mean(lev_m,na.rm=TRUE), levQC=mean(levQC), flow_m3s=mean(flow_m3s,na.rm=TRUE), flowQC=mean(flowQC)) %>%
+     mutate(dt=with_tz(as_datetime(UNIX), tzone = "Africa/Johannesburg")) %>%
+     mutate(da=as_date(dt)) %>%
+     group_by(da) %>%
+     summarize(mean.flow=mean(flow_m3s,na.rm=TRUE)) %>%
+     mutate(Site = "Sabie River - upstream")
 
-y <- read_csv("A7H008.csv", col_names = FALSE)
-y <- y %>%
-     rename(dt=X1,UNIX=X2,lev_m=X3,levQC=X4,flow_m3s=X5,flowQC=X6) # note UNIX date time is UTC
+sabiDn <- read_csv("X3H015.csv", col_names = FALSE)
+sabiDn <- sabiDn %>%
+     rename(dt=X1,UNIX=X2,lev_m=X3,levQC=X4,flow_m3s=X5,flowQC=X6) %>% # note UNIX date time is UTC
+     mutate(lev_m=replace(lev_m, which(lev_m<=0),NA)) %>%
+     mutate(flow_m3s=replace(flow_m3s, which(flow_m3s<=0),NA)) %>%
+     group_by(UNIX) %>%
+     summarize(lev_m=mean(lev_m,na.rm=TRUE), levQC=mean(levQC), flow_m3s=mean(flow_m3s,na.rm=TRUE), flowQC=mean(flowQC)) %>%
+     mutate(dt=with_tz(as_datetime(UNIX), tzone = "Africa/Johannesburg")) %>%
+     mutate(da=as_date(dt)) %>%
+     group_by(da) %>%
+     summarize(mean.flow=mean(flow_m3s,na.rm=TRUE)) %>%
+     mutate(Site = "Sabie River - downstream")
 
-z <- rbind(x,y)
+dat <- rbind(sabiDn,sabiUp,sandUp)
+dat2 <- dat %>%
+     mutate(dn = as.numeric(da))
+
+s <- min(dat2$dn) -1 # set as the day before the first day - DATUM
+n <- max(dat2$dn) - s
+sabUP <- array(NA, dim = n)
+sabDN <- sabUP
+sanUP <- sabUP
+daynumber <- array(NA, dim = n)
+
+for (i in 1:n) {
+     daynumber[i] <- i + s
+}
+for (i in 1:nrow(sabiUp)) {              # Sabie Upriver
+     p <- as.numeric(sabiUp$da[i]) - s
+     sabUP[p] <- sabiUp$mean.flow[i]
+}
+for (i in 1:nrow(sabiDn)) {              # Sabie Downriver
+     p <- as.numeric(sabiDn$da[i]) - s
+     sabDN[p] <- sabiDn$mean.flow[i]
+}
+for (i in 1:nrow(sandDn)) {              # Sand Upriver
+     p <- as.numeric(sandDn$da[i]) - s
+     sanDN[p] <- sandDn$mean.flow[i]
+}
+
+wide <- dat2 %>%
+     pivot_wider(names_from = Site, values_from = mean.flow) %>%
+     mutate(da = as_date(dn))
+rm(dat2)
+
+ggplot(dat) +
+     geom_point(aes(x=da, y=mean.flow, color=site)) +
+     xlab("Date") + 
+     ylab(TeX('Mean Discharge $(m^3/s)$')) + 
+     ylim(c(0,3000)) +
+     theme(aspect.ratio = 1) +
+     theme(axis.text = element_text(face = "plain", size = 14), 
+           axis.title = element_text(face = "plain", size = 14)) +
+     theme(legend.position="right", 
+           panel.background = element_rect(fill = "white", colour = "black"),
+           legend.text = element_text(face = "plain", size = 14), 
+           legend.title = element_text(face = "plain", size = 14))
+
+write_csv(wide, "sabieRiverBalance.csv")
+
 # Remove duplicate dates
 q <- x %>%
      mutate(lev_m=replace(lev_m, which(lev_m<=0),NA)) %>%
