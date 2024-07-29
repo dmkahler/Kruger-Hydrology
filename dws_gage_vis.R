@@ -72,7 +72,6 @@ sabDN <- sabUP
 sanUP <- sabUP
 daynumber <- array(NA, dim = n)
 
-
 for (i in 1:n) {
      daynumber[i] <- i + s
 }
@@ -103,7 +102,8 @@ monthly <- flow %>%
      mutate(net = sabiUp + sandUp - sabiDn) %>%
      mutate(yr = round(ym/100)) %>%
      mutate(mo = ym - (100 * yr)) %>%
-     mutate(dt = ymd(paste0(yr, "-", mo, "-", "01")))
+     mutate(dt = ymd(paste0(yr, "-", mo, "-", "01"))) %>%
+     filter(dt > ymd("1990-01-01"))
 ggplot(monthly) +
      geom_line(aes(x = dt, y = net)) +
      xlab("Date") + 
@@ -113,6 +113,9 @@ ggplot(monthly) +
      theme(axis.text = element_text(face = "plain", size = 14), 
            axis.title = element_text(face = "plain", size = 14),
            panel.background = element_rect(fill = "white", colour = "black"))
+
+
+
 
 
 
