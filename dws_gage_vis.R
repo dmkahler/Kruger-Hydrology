@@ -49,6 +49,19 @@ sabiDn <- sabiDn %>%
      mutate(Site = "Sabie River - downstream")
 
 dat <- rbind(sabiDn,sabiUp,sandUp)
+ggplot(dat) +
+     geom_point(aes(x=da, y=mean.flow, color=Site)) +
+     xlab("Date") + 
+     ylab(TeX('Mean Discharge $(m^3/s)$')) + 
+     ylim(c(0,3000)) +
+     theme(aspect.ratio = 1) +
+     theme(axis.text = element_text(face = "plain", size = 14), 
+           axis.title = element_text(face = "plain", size = 14)) +
+     theme(legend.position="right", 
+           panel.background = element_rect(fill = "white", colour = "black"),
+           legend.text = element_text(face = "plain", size = 14), 
+           legend.title = element_text(face = "plain", size = 14))
+
 dat2 <- dat %>%
      mutate(dn = as.numeric(da))
 
@@ -58,6 +71,7 @@ sabUP <- array(NA, dim = n)
 sabDN <- sabUP
 sanUP <- sabUP
 daynumber <- array(NA, dim = n)
+
 
 for (i in 1:n) {
      daynumber[i] <- i + s
@@ -70,30 +84,38 @@ for (i in 1:nrow(sabiDn)) {              # Sabie Downriver
      p <- as.numeric(sabiDn$da[i]) - s
      sabDN[p] <- sabiDn$mean.flow[i]
 }
-for (i in 1:nrow(sandDn)) {              # Sand Upriver
-     p <- as.numeric(sandDn$da[i]) - s
-     sanDN[p] <- sandDn$mean.flow[i]
+for (i in 1:nrow(sandUp)) {              # Sand Upriver
+     p <- as.numeric(sandUp$da[i]) - s
+     sanUP[p] <- sandUp$mean.flow[i]
 }
 
-wide <- dat2 %>%
-     pivot_wider(names_from = Site, values_from = mean.flow) %>%
-     mutate(da = as_date(dn))
-rm(dat2)
+rm(dat2, p, i)
+flow <- data.frame(daynumber) %>% # fails with tibble(), problem with preserving an array, even though it is only 1-D
+     mutate(dt = as_date(daynumber, origin = lubridate::origin))
+flow <- data.frame(flow,sabUP,sanUP,sabDN)
+# write_csv(flow, "sabieRiverBalance.csv")
 
-ggplot(dat) +
-     geom_point(aes(x=da, y=mean.flow, color=site)) +
+monthly <- flow %>%
+     mutate(yr = year(dt), mo = month(dt)) %>%
+     mutate(ym = 100 * yr + mo) %>%
+     group_by(ym) %>%
+     summarize(sabiUp = mean(sabUP, na.rm = TRUE), sandUp = mean(sanUP, na.rm = TRUE), sabiDn = mean(sabDN, na.rm = TRUE)) %>%
+     mutate(net = sabiUp + sandUp - sabiDn) %>%
+     mutate(yr = round(ym/100)) %>%
+     mutate(mo = ym - (100 * yr)) %>%
+     mutate(dt = ymd(paste0(yr, "-", mo, "-", "01")))
+ggplot(monthly) +
+     geom_line(aes(x = dt, y = net)) +
      xlab("Date") + 
-     ylab(TeX('Mean Discharge $(m^3/s)$')) + 
-     ylim(c(0,3000)) +
+     ylab(TeX('Net Monthly Mean Discharge $(m^3/s)$')) + 
+     ylim(c(-150,150)) +
      theme(aspect.ratio = 1) +
      theme(axis.text = element_text(face = "plain", size = 14), 
-           axis.title = element_text(face = "plain", size = 14)) +
-     theme(legend.position="right", 
-           panel.background = element_rect(fill = "white", colour = "black"),
-           legend.text = element_text(face = "plain", size = 14), 
-           legend.title = element_text(face = "plain", size = 14))
+           axis.title = element_text(face = "plain", size = 14),
+           panel.background = element_rect(fill = "white", colour = "black"))
 
-write_csv(wide, "sabieRiverBalance.csv")
+
+
 
 # Remove duplicate dates
 q <- x %>%
