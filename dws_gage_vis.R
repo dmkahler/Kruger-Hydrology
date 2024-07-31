@@ -5,9 +5,12 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(lubridate)
+library(forcats)
 library(latex2exp)
 # install_github("LimpopoLab/hydrostats")
 library(hydrostats)
+
+# Read in data
 
 sandUp <- read_csv("X3H008.csv", col_names = FALSE)
 sandUp <- sandUp %>%
@@ -62,6 +65,8 @@ ggplot(dat) +
            legend.text = element_text(face = "plain", size = 14), 
            legend.title = element_text(face = "plain", size = 14))
 
+# Sort to three columns by date
+
 dat2 <- dat %>%
      mutate(dn = as.numeric(da))
 
@@ -94,6 +99,8 @@ flow <- data.frame(daynumber) %>% # fails with tibble(), problem with preserving
 flow <- data.frame(flow,sabUP,sanUP,sabDN)
 # write_csv(flow, "sabieRiverBalance.csv")
 
+# Form monthly data, compute net flow
+
 monthly <- flow %>%
      mutate(yr = year(dt), mo = month(dt)) %>%
      mutate(ym = 100 * yr + mo) %>%
@@ -109,6 +116,26 @@ ggplot(monthly) +
      xlab("Date") + 
      ylab(TeX('Net Monthly Mean Discharge $(m^3/s)$')) + 
      ylim(c(-150,150)) +
+     theme(aspect.ratio = 1) +
+     theme(axis.text = element_text(face = "plain", size = 14), 
+           axis.title = element_text(face = "plain", size = 14),
+           panel.background = element_rect(fill = "white", colour = "black"))
+# positive indicates a losing river, negative indicates a gaining river
+
+# Get average flow by month.
+sandUPmonth <- sandUp %>%
+     mutate(mo = month(da)) %>%
+     group_by(mo) %>%
+     summarize(flow=mean(mean.flow, na.rm = TRUE))
+month <- as.factor(c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'))
+hmo <- c(7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6)
+month <- fct_reorder(month, hmo)
+sandUPmonth$month <- month
+
+ggplot(sandUPmonth) +
+     geom_col(aes(x = month, y = flow))+
+     xlab("Month of Hydrologic Year") + 
+     ylab(TeX('Monthly Mean Discharge $(m^3/s)$')) + 
      theme(aspect.ratio = 1) +
      theme(axis.text = element_text(face = "plain", size = 14), 
            axis.title = element_text(face = "plain", size = 14),
